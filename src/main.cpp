@@ -171,7 +171,7 @@ void apiLoop(std::stop_token token){
                 const auto response=tlp::fetchPvePrices();
                 replacePrices(response,true);
                 writeFile(cache,response);
-            }catch(const std::exception& e){
+            }catch(const std::exception&){
                 std::lock_guard guard(g_lock);
                 if(g_catalog.empty())g_error=L"API unavailable; press Ctrl+Shift+R to retry";
             }
@@ -273,7 +273,7 @@ void render(HWND h){
         drawText(dc,x+1,y,label.text,label.color,17);
     }
     if(g_demo||!g_selected.empty()){
-        const int x=std::max(10,rc.right-390),y=100;
+        const int x=std::max(10,static_cast<int>(rc.right)-390),y=100;
         RECT panel{x,y,x+370,y+124};
         HBRUSH bg=CreateSolidBrush(RGB(22,27,26));FillRect(dc,&panel,bg);DeleteObject(bg);
         drawText(dc,x+12,y+8,L"TARKOV LOOT PRICES | PvE",RGB(222,215,180),20);
