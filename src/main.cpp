@@ -33,6 +33,7 @@ HWND g_overlay{}, g_finder{}, g_edit{}, g_list{}, g_info{};
 RECT g_virtual{};
 std::mutex g_lock;
 std::atomic<bool> g_running{true}, g_refresh{false}, g_visible{true};
+std::atomic<std::uint64_t> g_catalogVersion{0};
 bool g_demo=false;
 std::vector<tlp::Pattern> g_patterns;
 std::vector<tlp::Item> g_catalog;
@@ -157,6 +158,7 @@ void replacePrices(const std::string& raw, bool fresh){
     g_byId.clear();
     for(const auto& item:g_catalog)g_byId.emplace(item.id,item);
     g_error=fresh?L"PvE prices updated":L"Using cached PvE prices";
+    ++g_catalogVersion;
 }
 void apiLoop(std::stop_token token){
     const auto cache=g_storage/L"pve_prices.json";
@@ -212,7 +214,7 @@ void scanLoop(std::stop_token token){
             RECT rect{area.a.x,area.a.y,area.b.x,area.b.y};
             auto frame=capture(rect);
             if(frame.pixels.empty())continue;
-            std::uint64_t hash=14695981039346656037ull;
+            std::uint64_t hash=14695981039346656037ull ^ g_catalogVersion.load();
             for(int y=0;y<frame.height;y+=17)for(int x=0;x<frame.width;x+=17){
                 const auto i=(static_cast<std::size_t>(y)*frame.width+x)*4;
                 for(int k=0;k<3;++k){hash^=frame.pixels[i+k];hash*=1099511628211ull;}
@@ -297,7 +299,8 @@ void updateFinder(){
     SendMessageW(g_list,LB_RESETCONTENT,0,0);
     g_listMapping.clear();
     std::vector<tlp::Item> snapshot;
-    {std::lock_guard guard(g_lock);snapshot=g_catalog;}
+    std::wstring status;
+    {std::lock_guard guard(g_lock);snapshot=g_catalog;status=g_error;}
     for(std::size_t i=0;i<snapshot.size()&&g_listMapping.size()<200;++i){
         auto name=widen(snapshot[i].name);
         std::wstring lc=name; CharLowerBuffW(lc.data(),static_cast<DWORD>(lc.size()));
@@ -306,7 +309,7 @@ void updateFinder(){
         SendMessageW(g_list,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(line.c_str()));
         g_listMapping.push_back(i);
     }
-    SetWindowTextW(g_info,(L"PvE items: "+std::to_wstring(snapshot.size())+L" | "+g_error).c_str());
+    SetWindowTextW(g_info,(L"PvE items: "+std::to_wstring(snapshot.size())+L" | "+status).c_str());
 }
 LRESULT CALLBACK finderProc(HWND hwnd,UINT message,WPARAM wParam,LPARAM lParam){
     switch(message){
