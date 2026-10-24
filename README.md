@@ -18,12 +18,12 @@ Native external Windows x64 overlay for official **Escape from Tarkov PvE**. The
 1. Download the successful workflow **TarkovLootPrices-windows-x64** artifact from the GitHub Actions tab.
 2. Unzip the GitHub artifact, then unzip the packaged TarkovLootPrices-windows-x64.zip inside.
 3. Keep TarkovLootPrices.exe and the data/ folder together. Run the EXE.
-4. Use **Borderless Window** at **1920x1080** with game UI at **100%** for this initial scanner implementation; the grid pitch is currently fixed at **63 pixels**.
+4. Use **Borderless Window** at **1920x1080** with game UI at **100%** for initial calibration. The default grid pitch is **63 pixels**, but can be changed in settings.
 5. On first run, press **Ctrl+Shift+F** to open the PvE search window; this lets you verify that network pricing works before configuring scanning.
 6. To calibrate the personal inventory grid, point at its exact top-left grid border and press **Ctrl+Alt+1**. Point at the bottom-right border of the whole grid and press **Ctrl+Alt+2**.
-7. Optionally repeat for the open loot container using **Ctrl+Alt+3** and **Ctrl+Alt+4**. Regions are saved to %LOCALAPPDATA%/TarkovLootPrices/settings.ini.
+7. Optionally repeat for the open loot container using **Ctrl+Alt+3** and **Ctrl+Alt+4**. Regions are saved to %LOCALAPPDATA%/TarkovLootPrices/settings.ini. For nonstandard UI scales, add a `[capture]` section with `cell_pitch=63` (change 63 to measured cell size in pixels), then restart the program.
 
-Grid crops must include **whole 63px cells**; a few pixels of offset can substantially reduce recognition quality. On-screen recognized labels use F for flea value (last low or 24-hour fallback) and T for best trader value when flea data is unavailable. Costs do not include flea fees. Stacks, durability, modded equipment, found-in-raid restrictions and duplicate-looking icons are not fully accounted for; treat values as guides, not exact sale proceeds.
+Grid crops must include **whole cells**, each exactly the configured pixel pitch; a few pixels of offset can substantially reduce recognition quality. On-screen recognized labels use F for flea value (last low or 24-hour fallback) and T for best trader value when flea data is unavailable. Costs do not include flea fees. Stacks, durability, modded equipment, found-in-raid restrictions and duplicate-looking icons are not fully accounted for; treat values as guides, not exact sale proceeds.
 
 ## Hotkeys
 
@@ -32,6 +32,7 @@ Grid crops must include **whole 63px cells**; a few pixels of offset can substan
 | Ctrl+Shift+F | Open/close the PvE item price search window |
 | Ctrl+Shift+P | Toggle automatic price labels |
 | Ctrl+Shift+R | Refresh the cached PvE catalogue |
+| Ctrl+Shift+V | Cycle between market price (F), best value per slot (S) and best sale offer (B) |
 | Ctrl+Shift+S | Save an offline full-screen BMP screenshot to %LOCALAPPDATA%/TarkovLootPrices/screen_capture.bmp |
 | Ctrl+Shift+Q | Exit the program |
 | Ctrl+Alt+1 / 2 | Set upper-left / lower-right personal inventory grid boundaries |
