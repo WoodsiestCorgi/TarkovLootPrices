@@ -1,18 +1,15 @@
 name: Windows x64 build
-
 on:
   push:
     branches: [main, 'feat/**']
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 15
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Configure MSVC x64
@@ -21,10 +18,42 @@ jobs:
         run: cmake --build build --config Release --parallel
       - name: Run tests
         run: ctest --test-dir build -C Release --output-on-failure
-      - name: Upload Windows executable
+      - name: Restore icon descriptor cache
+        id: iconcache
+        uses: actions/cache@v4
+        with:
+          path: data/icons.json
+          key: tarkov-pve-icons-v1-2026-10
+      - name: Setup Python
+        if: steps.iconcache.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image processing dependency
+        if: steps.iconcache.outputs.cache-hit != 'true'
+        run: python -m pip install --disable-pip-version-check pillow==11.3.0
+      - name: Build item icon descriptor index
+        if: steps.iconcache.outputs.cache-hit != 'true'
+        run: python tools/build_index.py --output data/icons.json --workers 20
+      - name: Verify descriptor index
+        shell: pwsh
+        run: |
+          if (!(Test-Path data/icons.json)) { throw "Missing icon index" }
+          $json = Get-Content data/icons.json -Raw | ConvertFrom-Json
+          if ($json.items.Count -lt 200) { throw "Too few item patterns: $($json.items.Count)" }
+          Write-Host "$($json.items.Count) item fingerprints prepared"
+      - name: Package native Windows app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/data -Force | Out-Null
+          Copy-Item build/Release/TarkovLootPrices.exe dist/
+          Copy-Item data/icons.json dist/data/
+          Copy-Item README.md dist/
+          Compress-Archive -Path dist/* -DestinationPath TarkovLootPrices-windows-x64.zip -Force
+      - name: Upload Windows portable app
         uses: actions/upload-artifact@v4
         with:
           name: TarkovLootPrices-windows-x64
-          path: build/Release/TarkovLootPrices.exe
+          path: TarkovLootPrices-windows-x64.zip
           if-no-files-found: error
           retention-days: 14
