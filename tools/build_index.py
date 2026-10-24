@@ -6,6 +6,7 @@ import json
 import pathlib
 import time
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 from PIL import Image
 
 API = "https://api.tarkov.dev/graphql"
@@ -15,8 +16,12 @@ def download(url, data=None, timeout=15):
     req = Request(url, data=data, headers={
         "User-Agent": "TarkovLootPrices/0.3",
         "Content-Type": "application/json"})
-    with urlopen(req, timeout=timeout) as r:
-        return r.read()
+    try:
+        with urlopen(req, timeout=timeout) as r:
+            return r.read()
+    except HTTPError as error:
+        print('HTTP', error.code, 'from', url, error.read(4000).decode('utf-8', errors='replace'), flush=True)
+        raise
 
 def descriptor(row):
     if not row.get("gridImageLink"):
