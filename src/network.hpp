@@ -41,7 +41,7 @@ inline std::string fetchPvePrices() {
     DWORD status = 0, statusSize = sizeof(status);
     if (!WinHttpQueryHeaders(request.h,WINHTTP_QUERY_STATUS_CODE|WINHTTP_QUERY_FLAG_NUMBER,
                              WINHTTP_HEADER_NAME_BY_INDEX,&status,&statusSize,WINHTTP_NO_HEADER_INDEX) || status!=200)
-        throw std::runtime_error("Price API returned HTTP error");
+        throw std::runtime_error("Price API returned HTTP status " + std::to_string(status));
     std::string response;
     while (true) {
         DWORD available = 0;
