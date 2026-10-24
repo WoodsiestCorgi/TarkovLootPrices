@@ -16,7 +16,7 @@ Native external Windows x64 overlay for official **Escape from Tarkov PvE**. The
 ## Installation
 
 1. Download the successful workflow **TarkovLootPrices-windows-x64** artifact from the GitHub Actions tab.
-2. Unzip the GitHub artifact, then unzip the packaged TarkovLootPrices-windows-x64.zip inside.
+2. Unzip the GitHub artifact once. It contains TarkovLootPrices.exe, README.md and the data/ directory.
 3. Keep TarkovLootPrices.exe and the data/ folder together. Run the EXE.
 4. Use **Borderless Window** at **1920x1080** with game UI at **100%** for initial calibration. The default grid pitch is **63 pixels**, but can be changed in settings.
 5. On first run, press **Ctrl+Shift+F** to open the PvE search window; this lets you verify that network pricing works before configuring scanning.
