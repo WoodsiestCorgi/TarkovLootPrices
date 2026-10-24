@@ -73,14 +73,14 @@ inline double comparePattern(const ImageView& image, int x, int y, int cw, int c
 inline std::vector<Found> scanGrid(const ImageView& image, const std::vector<Pattern>& patterns, int pitch=63, double maxError=21.0) {
     std::vector<Found> candidates;
     if(pitch<12||patterns.empty()||!image.bgra)return candidates;
-    const int cols=(image.width-1)/pitch,rows=(image.height-1)/pitch;
+    const int cols=image.width/pitch,rows=image.height/pitch;
     if(cols<1||rows<1)return candidates;
     for(int row=0;row<rows;++row) for(int col=0;col<cols;++col){
         Found best{};best.error=1e6;
         double nextError=1e6;
         for(const auto& p:patterns){
             if(col+p.width>cols||row+p.height>rows)continue;
-            const double error=comparePattern(image,col*pitch,row*pitch,p.width*pitch+1,p.height*pitch+1,p);
+            const double error=comparePattern(image,col*pitch,row*pitch,p.width*pitch,p.height*pitch,p);
             if(error<best.error){nextError=best.error;best={p.id,col,row,p.width,p.height,error};}
             else if(error<nextError)nextError=error;
         }
