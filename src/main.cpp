@@ -151,8 +151,8 @@ void writeFile(const std::filesystem::path& path,const std::string& content){
         std::filesystem::rename(tmp,path);
     }catch(...){}
 }
-void replacePrices(const std::string& raw, bool fresh){
-    const auto parsed=tlp::parseCatalog(raw);
+void replacePrices(const std::string& raw, const std::string& locale, bool fresh){
+    const auto parsed=tlp::parseCatalog(raw,locale);
     std::lock_guard guard(g_lock);
     g_catalog=parsed;
     g_byId.clear();
@@ -162,20 +162,32 @@ void replacePrices(const std::string& raw, bool fresh){
 }
 void apiLoop(std::stop_token token){
     const auto cache=g_storage/L"pve_prices.json";
-    try {
+    const auto translationCache=g_storage/L"pve_items_ru.json";
+    std::string locale=readFile(translationCache);
+    if(locale.empty()){
+        try{
+            locale=tlp::fetchPveRussian();
+            writeFile(translationCache,locale);
+        }catch(const std::exception&){}
+    }
+    try{
         const auto disk=readFile(cache);
-        if(!disk.empty()){replacePrices(disk,false);PostMessageW(g_overlay,kDataReady,0,0);}
+        if(!disk.empty()){replacePrices(disk,locale,false);PostMessageW(g_overlay,kDataReady,0,0);}
     }catch(...){}
     int seconds=300;
     while(!token.stop_requested()&&g_running){
         if(seconds>=300||g_refresh.exchange(false)){
             try{
+                if(locale.empty()){
+                    try{locale=tlp::fetchPveRussian();writeFile(translationCache,locale);}
+                    catch(const std::exception&){}
+                }
                 const auto response=tlp::fetchPvePrices();
-                replacePrices(response,true);
+                replacePrices(response,locale,true);
                 writeFile(cache,response);
             }catch(const std::exception&){
                 std::lock_guard guard(g_lock);
-                if(g_catalog.empty())g_error=L"API unavailable; press Ctrl+Shift+R to retry";
+                if(g_catalog.empty())g_error=L"PvE JSON API unavailable; Ctrl+Shift+R retries";
             }
             PostMessageW(g_overlay,kDataReady,0,0);
             seconds=0;
