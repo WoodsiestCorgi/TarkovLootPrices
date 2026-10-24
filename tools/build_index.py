@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from PIL import Image
 
-API = "https://api.tarkov.dev/graphql"
+API = "https://json.tarkov.dev/pve/items"
 QUERY = "query { items(gameMode:pve, lang:ru) { id name width height gridImageLink } }"
 
 def download(url, data=None, timeout=15):
@@ -52,7 +52,19 @@ def main():
     p.add_argument("--workers", type=int, default=20)
     p.add_argument("--limit", type=int, default=0)
     args = p.parse_args()
-    rows = json.loads(download(API, json.dumps({"query": QUERY}).encode())).get("data",{}).get("items",[])
+    result = json.loads(download(API))
+    print("JSON payload keys:", list(result)[:12], flush=True)
+    data = result.get("data", result)
+    print("Data keys:", list(data)[:12] if isinstance(data, dict) else type(data), flush=True)
+    rows = data.get("items", []) if isinstance(data,dict) else []
+    if isinstance(rows,dict):
+        first = next(iter(rows.values()), {})
+        print("Example item:",str(first)[:1800],flush=True)
+        rows=list(rows.values())
+    elif isinstance(rows,list):
+        print("Example item:",str(rows[0])[:1800] if rows else "empty",flush=True)
+    else:
+        raise RuntimeError("Unsupported items payload")
     if args.limit > 0:
         rows = rows[:args.limit]
     print("Preparing", len(rows), "icon descriptors", flush=True)
