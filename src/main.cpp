@@ -34,6 +34,7 @@ RECT g_virtual{};
 std::mutex g_lock;
 std::atomic<bool> g_running{true}, g_refresh{false}, g_visible{true};
 std::atomic<std::uint64_t> g_catalogVersion{0};
+std::atomic<int> g_priceMode{0}; // 0=flea, 1=roubles per slot, 2=best selling price
 bool g_demo=false;
 std::vector<tlp::Pattern> g_patterns;
 std::vector<tlp::Item> g_catalog;
@@ -226,7 +227,7 @@ void scanLoop(std::stop_token token){
             RECT rect{area.a.x,area.a.y,area.b.x,area.b.y};
             auto frame=capture(rect);
             if(frame.pixels.empty())continue;
-            std::uint64_t hash=14695981039346656037ull ^ g_catalogVersion.load();
+            std::uint64_t hash=14695981039346656037ull ^ g_catalogVersion.load() ^ (static_cast<std::uint64_t>(g_priceMode.load())<<56);
             for(int y=0;y<frame.height;y+=17)for(int x=0;x<frame.width;x+=17){
                 const auto i=(static_cast<std::size_t>(y)*frame.width+x)*4;
                 for(int k=0;k<3;++k){hash^=frame.pixels[i+k];hash*=1099511628211ull;}
@@ -246,9 +247,11 @@ void scanLoop(std::stop_token token){
                 auto it=prices.find(found.id);
                 if(it==prices.end())continue;
                 const auto& item=it->second;
-                const auto value=item.fleaOrAverage()>0?item.fleaOrAverage():item.trader;
+                const int mode=g_priceMode.load();
+                const auto raw=item.fleaOrAverage()>0?item.fleaOrAverage():item.trader;
+                const auto value=mode==2?item.bestOffer():mode==1?item.perSlot():raw;
                 if(value<=0)continue;
-                const wchar_t source=item.fleaOrAverage()>0?L'F':L'T';
+                const wchar_t source=mode==1?L'S':mode==2?L'B':item.fleaOrAverage()>0?L'F':L'T';
                 cachedLabels[n].push_back({area.a.x+found.x*kPitch+3,area.a.y+found.y*kPitch+3,
                     money(value)+L" "+source, value>=100000?RGB(110,235,165):RGB(245,214,128)});
             }
@@ -363,6 +366,7 @@ void hotkey(HWND hwnd,WPARAM id){
         return;
     }
     if(id==kHotkeyRefresh){g_refresh=true;return;}
+    if(id==6){g_priceMode=(g_priceMode.load()+1)%3; ++g_catalogVersion;return;}
     if(id==kHotkeyScreenshot){
         ShowWindow(g_overlay,SW_HIDE);
         Sleep(80);saveScreenshot();
@@ -389,6 +393,7 @@ LRESULT CALLBACK overlayProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam){
         RegisterHotKey(hwnd,kHotkeyFind,MOD_CONTROL|MOD_SHIFT|MOD_NOREPEAT,'F');
         RegisterHotKey(hwnd,kHotkeyRefresh,MOD_CONTROL|MOD_SHIFT|MOD_NOREPEAT,'R');
         RegisterHotKey(hwnd,kHotkeyScreenshot,MOD_CONTROL|MOD_SHIFT|MOD_NOREPEAT,'S');
+        RegisterHotKey(hwnd,6,MOD_CONTROL|MOD_SHIFT|MOD_NOREPEAT,'V');
         for(int i=0;i<4;++i)RegisterHotKey(hwnd,10+i,MOD_CONTROL|MOD_ALT|MOD_NOREPEAT,'1'+i);
         return 0;
     case WM_HOTKEY:hotkey(hwnd,wParam);return 0;
@@ -399,7 +404,7 @@ LRESULT CALLBACK overlayProc(HWND hwnd,UINT msg,WPARAM wParam,LPARAM lParam){
     case WM_PAINT:render(hwnd);return 0;
     case WM_DESTROY:
         g_running=false;
-        for(int i=1;i<=5;++i)UnregisterHotKey(hwnd,i);
+        for(int i=1;i<=6;++i)UnregisterHotKey(hwnd,i);
         for(int i=10;i<=13;++i)UnregisterHotKey(hwnd,i);
         PostQuitMessage(0);return 0;
     }
