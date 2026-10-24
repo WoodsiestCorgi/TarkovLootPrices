@@ -25,9 +25,9 @@ constexpr UINT kDataReady = WM_APP+1;
 constexpr UINT kScanReady = WM_APP+2;
 constexpr UINT kHotkeyToggle = 1, kHotkeyQuit = 2, kHotkeyFind = 3;
 constexpr UINT kHotkeyRefresh = 4, kHotkeyScreenshot=5;
-constexpr int kPitch=63;
+constexpr int kDefaultPitch=63;
 struct Screen { int width{}, height{}; std::vector<std::uint8_t> pixels; };
-struct Region { POINT a{}, b{}; bool valid() const {return b.x>a.x+kPitch && b.y>a.y+kPitch;} };
+struct Region { POINT a{}, b{}; bool valid() const {return b.x>a.x+30 && b.y>a.y+30;} };
 struct Label { int x{},y{}; std::wstring text; COLORREF color{}; };
 HWND g_overlay{}, g_finder{}, g_edit{}, g_list{}, g_info{};
 RECT g_virtual{};
@@ -35,6 +35,7 @@ std::mutex g_lock;
 std::atomic<bool> g_running{true}, g_refresh{false}, g_visible{true};
 std::atomic<std::uint64_t> g_catalogVersion{0};
 std::atomic<int> g_priceMode{0}; // 0=flea, 1=roubles per slot, 2=best selling price
+std::atomic<int> g_pitch{kDefaultPitch};
 bool g_demo=false;
 std::vector<tlp::Pattern> g_patterns;
 std::vector<tlp::Item> g_catalog;
@@ -69,6 +70,7 @@ std::filesystem::path userPath() {
 }
 void readSettings(){
     const auto cfg=(g_storage/L"settings.ini").wstring();
+    g_pitch=std::clamp(static_cast<int>(GetPrivateProfileIntW(L"capture",L"cell_pitch",kDefaultPitch,cfg.c_str())),30,160);
     for(int n=0;n<2;++n) {
         auto section=n==0?L"inventory":L"container";
         auto& r=g_regions[n];
@@ -242,7 +244,8 @@ void scanLoop(std::stop_token token){
             lastHashes[n]=hash;
             cachedLabels[n].clear();
             const tlp::ImageView view{frame.pixels.data(),frame.width,frame.height,frame.width*4};
-            const auto matches=tlp::scanGrid(view,g_patterns,kPitch,19.0);
+            const int pitch=g_pitch.load();
+            const auto matches=tlp::scanGrid(view,g_patterns,pitch,19.0);
             for(const auto& found:matches){
                 auto it=prices.find(found.id);
                 if(it==prices.end())continue;
@@ -252,7 +255,7 @@ void scanLoop(std::stop_token token){
                 const auto value=mode==2?item.bestOffer():mode==1?item.perSlot():raw;
                 if(value<=0)continue;
                 const wchar_t source=mode==1?L'S':mode==2?L'B':item.fleaOrAverage()>0?L'F':L'T';
-                cachedLabels[n].push_back({area.a.x+found.x*kPitch+3,area.a.y+found.y*kPitch+3,
+                cachedLabels[n].push_back({area.a.x+found.x*pitch+3,area.a.y+found.y*pitch+3,
                     money(value)+L" "+source, value>=100000?RGB(110,235,165):RGB(245,214,128)});
             }
             labels.insert(labels.end(),cachedLabels[n].begin(),cachedLabels[n].end());
