@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: windows-2022
@@ -18,8 +21,6 @@ jobs:
         run: cmake --build build --config Release --parallel
       - name: Run tests
         run: ctest --test-dir build -C Release --output-on-failure
-      - name: Probe official PvE JSON fields
-        run: python tools/inspect_api.py
       - name: Restore icon descriptor cache
         id: iconcache
         uses: actions/cache@v4
