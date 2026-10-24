@@ -1,6 +1,5 @@
 #include "price_math.hpp"
 #include <iostream>
-
 int main() {
     using tlp::PriceQuote;
     const PriceQuote example{850000, 125000, 50000, 2, 1};
