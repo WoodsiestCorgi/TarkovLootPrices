@@ -1,9 +1,9 @@
 """Temporary JSON schema diagnostic. No private data."""
 import json
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 for path in ["pve/items","pve/items_ru"]:
     try:
-        with urlopen("https://json.tarkov.dev/"+path,timeout=20) as r:
+        with urlopen(Request("https://json.tarkov.dev/"+path,headers={"User-Agent":"TarkovLootPrices/0.3","Accept":"application/json"}),timeout=20) as r:
             root=json.load(r)
         print(path,"root keys:",list(root)[:12])
         data=root.get("data",root)
