@@ -1,6 +1,5 @@
 #include <windows.h>
 #include <shlobj.h>
-#include <gdiplus.h>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -18,7 +17,6 @@
 #include "network.hpp"
 #include "icon_scan.hpp"
 
-using namespace Gdiplus;
 namespace {
 constexpr wchar_t kClass[] = L"TLPOverlay";
 constexpr wchar_t kFinderClass[] = L"TLPFinder";
@@ -185,10 +183,16 @@ void apiLoop(std::stop_token token){
     }
 }
 void scanLoop(std::stop_token token){
+    std::array<std::uint64_t,2> lastHashes{};
+    std::array<std::vector<Label>,2> cachedLabels;
     while(!token.stop_requested()&&g_running){
         if(!g_visible||!tarkovForeground()||g_patterns.empty()){
-            {std::lock_guard guard(g_lock); if(!g_labels.empty()){g_labels.clear();PostMessageW(g_overlay,kScanReady,0,0);}}
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            {std::lock_guard guard(g_lock);
+                if(!g_labels.empty()){g_labels.clear();PostMessageW(g_overlay,kScanReady,0,0);}
+            }
+            lastHashes={};
+            cachedLabels={};
+            std::this_thread::sleep_for(std::chrono::milliseconds(550));
             continue;
         }
         Region areas[2];
@@ -197,11 +201,31 @@ void scanLoop(std::stop_token token){
             areas[0]=g_regions[0]; areas[1]=g_regions[1];prices=g_byId;
         }
         std::vector<Label> labels;
-        for(const auto& area:areas){
-            if(!area.valid())continue;
+        bool changed=false;
+        for(int n=0;n<2;++n){
+            const auto& area=areas[n];
+            if(!area.valid()){
+                if(!cachedLabels[n].empty())changed=true;
+                cachedLabels[n].clear();lastHashes[n]=0;
+                continue;
+            }
             RECT rect{area.a.x,area.a.y,area.b.x,area.b.y};
             auto frame=capture(rect);
             if(frame.pixels.empty())continue;
+            std::uint64_t hash=14695981039346656037ull;
+            for(int y=0;y<frame.height;y+=17)for(int x=0;x<frame.width;x+=17){
+                const auto i=(static_cast<std::size_t>(y)*frame.width+x)*4;
+                for(int k=0;k<3;++k){hash^=frame.pixels[i+k];hash*=1099511628211ull;}
+            }
+            hash^=static_cast<std::uint64_t>(static_cast<std::uint32_t>(area.a.x));hash*=1099511628211ull;
+            hash^=static_cast<std::uint64_t>(static_cast<std::uint32_t>(area.a.y));hash*=1099511628211ull;
+            if(lastHashes[n]==hash){
+                labels.insert(labels.end(),cachedLabels[n].begin(),cachedLabels[n].end());
+                continue;
+            }
+            changed=true;
+            lastHashes[n]=hash;
+            cachedLabels[n].clear();
             const tlp::ImageView view{frame.pixels.data(),frame.width,frame.height,frame.width*4};
             const auto matches=tlp::scanGrid(view,g_patterns,kPitch,19.0);
             for(const auto& found:matches){
@@ -211,12 +235,15 @@ void scanLoop(std::stop_token token){
                 const auto value=item.fleaOrAverage()>0?item.fleaOrAverage():item.trader;
                 if(value<=0)continue;
                 const wchar_t source=item.fleaOrAverage()>0?L'F':L'T';
-                labels.push_back({area.a.x+found.x*kPitch+3,area.a.y+found.y*kPitch+3,
+                cachedLabels[n].push_back({area.a.x+found.x*kPitch+3,area.a.y+found.y*kPitch+3,
                     money(value)+L" "+source, value>=100000?RGB(110,235,165):RGB(245,214,128)});
             }
+            labels.insert(labels.end(),cachedLabels[n].begin(),cachedLabels[n].end());
         }
-        {std::lock_guard guard(g_lock);g_labels=std::move(labels);}
-        PostMessageW(g_overlay,kScanReady,0,0);
+        if(changed){
+            {std::lock_guard guard(g_lock);g_labels=std::move(labels);}
+            PostMessageW(g_overlay,kScanReady,0,0);
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     }
 }
